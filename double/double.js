@@ -209,9 +209,6 @@ javascript: (() => {
     setInterval(checkState, 1000);
     checkState();
     controlBtn.addEventListener("click", startAutoPilot);
-    window.addEventListener("keydown", (e) => {
-      console.log("keydown event " + e.target);
-    });
   };
 
   init();
