@@ -1,8 +1,35 @@
 javascript: (() => {
 
+  /* 変数定義 ------------------ */
+  let controlBtn, stateTxt, container;
+  const exitBtn = document.getElementById("exitDockMessage");
+  const targetMessageContainer = document.getElementById("targetMessage");
+  const targetMessage = targetMessageContainer.querySelector("p");
+  const targetCancelBtn = targetMessageContainer.querySelector("a");
+  const parkBtn = document.getElementById("parkButton");
+  const batteryBtn = document.getElementById("sessionBatteryButton");
+  const singleActionEvent = new MouseEvent('click', {
+    'view': window,
+    'bubbles': true,
+    'cancelable': true
+  });
+  /* 変数定義 ------------------ */
+
+
   /* 関数定義 -------------- */
   const getRandomNumber = (min, max) => Math.random() * (max - min) + min;
   /* 関数定義 -------------- */
+
+
+  /* bundle.jsから --------- */
+  const __deployKickstands = (() => deployKickstands)();
+  const __retractKickstands = (() => retractKickstands)();
+  const __kickstandState = (() => kickstandState)();
+  const __kDRCommandTargetDrive = (() => kDRCommandTargetDrive)();
+  const __sendCommandWithData = (() => sendCommandWithData)();
+  const __drawDepth = (() => drawDepth)();
+  /* bundle.jsから --------- */
+
 
   /* クラス定義 ------------- */
   class Double3 {
@@ -23,6 +50,7 @@ javascript: (() => {
     state = Double3.states.home;
     _actionTimer;
     _currentActionCode;
+    _dockPosition = { x: 1.0652568100820683, y: 0.19972206896042588 };
 
     get battery() {
       return Number(batteryBtn.title.replace(/(.*)%/, "$1"));
@@ -30,13 +58,32 @@ javascript: (() => {
     get isDocking() {
       return exitBtn.style.display != "none";
     }
-
+    get isParking() {
+      return kickstandState == kDRKickstand_stateDeployed;
+    }
+    get isTargeting() {
+      targetMessageContainer.style.display == "block" && targetMessage.textContent.indexOf("target") >= 0;
+    }
     get stateStr() {
       return Object.keys(Double3.states).find(k => Double3.states[k] == this.state);
     }
-
     get actionStr() {
-      return Object.keys(Double3.actions).find(k => Double3.actions[k] == this._currentActionCode);
+      return Object.keys(Double3.actions).find(k => Double3.actions[k] == this._currentActionCode) || "---";
+    }
+    get dockId() {
+      console.log("__drawDepth");
+      console.log(__drawDepth);
+      const objects = __drawDepth.gp.scene.children;
+      for (let i = 0; i < objects.length; i++) {
+        const object = objects[i];
+        console.log(object.name, object);
+        if (!("name" in object)) continue;
+        if (object.name.indexOf("dock_") >= 0) {
+          console.log("find", parseInt(object.name.replace("dock_", "")));
+          return parseInt(object.name.replace("dock_", ""));
+        }
+      }
+      return -1;
     }
 
     constructor() { }
@@ -56,8 +103,7 @@ javascript: (() => {
     }
 
     exitDock() {
-      /* MouseEvent作らないといけないかも */
-      exitBtn.click();
+      exitBtn.dispatchEvent(singleActionEvent);
     }
 
     startAutoPilot() {
@@ -114,21 +160,38 @@ javascript: (() => {
       this.endAction();
     }
 
-    /* TODO: 未実装
-    // park() {
-    //   // parkBtn.click()
-    //   this.state = Double3.states.parking;
-    // }
+    park() {
+      __deployKickstands();
+      this.state = Double3.states.parking;
+    }
 
-    // unPark() {
-    //   this.state = Double3.states.idle;
-    // }
+    unPark() {
+      __retractKickstands();
+      this.state = Double3.states.idle;
+    }
 
-    // goHome() {
-    //   // 家に帰る処理
-    //   this.state = Double3.states.home;
-    // }
-    */
+    goDock() {
+      /* 家に帰る処理 */
+      __sendCommandWithData(__kDRCommandTargetDrive, this._dockPosition);
+    }
+
+    dock() {
+      /* TODO: 帰れたらdockのボタンを押したいがcanvas内にボタンがある */
+      if (this.dockId < 0) return;
+      if (this.isTargeting) targetCancelBtn.dispatchEvent(singleActionEvent);
+      __sendCommandWithData(__kDRCommandTargetDrive, { dockId: this.dockId });
+
+      /* TODO: 非同期でステート戻せたらいいんだけど... */
+      /* this.state = Double3.states.home; */
+    }
+
+    setDockPosition(p) {
+      if (!("x" in p) || !("y" in p)) {
+        console.warn("##### Unexpected position #####");
+        return;
+      }
+      this._dockPosition = p;
+    }
 
     _exec(event) {
       document.body.dispatchEvent(event);
@@ -138,17 +201,11 @@ javascript: (() => {
   /* クラス定義 ------------- */
 
 
-  /* 変数定義 -------------- */
-  let controlBtn, stateTxt, container;
-  const exitBtn = document.getElementById("exitDockMessage");
-  const parkBtn = document.getElementById("parkButton");
-  const batteryBtn = document.getElementById("sessionBatteryButton");
-  const double3 = new Double3();
-  /* 変数定義 -------------- */
-
-
   /* 初期化 ---------------- */
   const init = () => {
+
+    const double3 = new Double3();
+    window.double3 = double3;
 
     const createUI = () => {
       container = document.createElement("div");
