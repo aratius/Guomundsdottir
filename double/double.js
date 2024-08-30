@@ -3,9 +3,6 @@ javascript: (() => {
   /* 変数定義 ------------------ */
   let controlBtn, stateTxt, container;
   const exitBtn = document.getElementById("exitDockMessage");
-  const targetMessageContainer = document.getElementById("targetMessage");
-  const targetMessage = targetMessageContainer.querySelector("p");
-  const targetCancelBtn = targetMessageContainer.querySelector("a");
   const parkBtn = document.getElementById("parkButton");
   const batteryBtn = document.getElementById("sessionBatteryButton");
   const singleActionEvent = new MouseEvent('click', {
@@ -36,7 +33,7 @@ javascript: (() => {
 
     static get states() { return { autoPilot: 1, idle: 2, parking: 3, home: 4 }; }
     static get actions() { return { forward: 38, backward: 40, panLeft: 37, panRight: 39, up: 82, down: 70 }; }
-    static get actionTypes() { return { go: 1, rotate: 2, upDown: 3 }; }
+    static get actionTypes() { return { go: 1, rotate: 2/*, upDown: 3*/ }; }
     static createActionEvent(event, keyCode) {
       const keyEvent = event == "start" ? "keydown" : event == "end" ? "keyup" : "";
       if (keyEvent == "") console.warn("##### Unknown event #####");
@@ -60,9 +57,6 @@ javascript: (() => {
     }
     get isParking() {
       return kickstandState == kDRKickstand_stateDeployed;
-    }
-    get isTargeting() {
-      targetMessageContainer.style.display == "block" && targetMessage.textContent.indexOf("target") >= 0;
     }
     get stateStr() {
       return Object.keys(Double3.states).find(k => Double3.states[k] == this.state);
@@ -137,14 +131,16 @@ javascript: (() => {
           this.endAction();
           console.log("[AUTOPILOT]: End action " + actionKey);
           /* インターバル */
+          const intervalTime = getRandomNumber(1000, 10000);
           this._actionTimer = setTimeout(() => {
             /* 次のアクションを今回のアクション以外から選択 */
             const actionTypesCopied = { ...Double3.actionTypes };
             delete actionTypesCopied[actionKey];
             const nextActionTypeArr = Object.keys(actionTypesCopied);
             const nextActionType = Double3.actionTypes[nextActionTypeArr[Math.floor(Math.random() * nextActionTypeArr.length)]];
-            action(nextActionType, getRandomNumber(5000, 10000));
-          }, getRandomNumber(1000, 10000));
+            const actionTime = getRandomNumber(5000, 10000);
+            action(nextActionType, actionTime);
+          }, intervalTime);
         }, time);
       };
 
@@ -178,7 +174,7 @@ javascript: (() => {
     dock() {
       /* TODO: 帰れたらdockのボタンを押したいがcanvas内にボタンがある */
       if (this.dockId < 0) return;
-      if (this.isTargeting) targetCancelBtn.dispatchEvent(singleActionEvent);
+      /* NOTE: 3Dモデルにホバーがないと動かない */
       __sendCommandWithData(__kDRCommandTargetDrive, { dockId: this.dockId });
 
       /* TODO: 非同期でステート戻せたらいいんだけど... */
@@ -227,7 +223,7 @@ javascript: (() => {
       controlBtn.style.borderRadius = "25px";
       controlBtn.style.borderRadius = 2;
       controlBtn.style.border = "2px solid";
-      controlBtn.style.background = "black";
+      controlBtn.style.background = "transparent";
 
       stateTxt = document.createElement("p");
       stateTxt.style.display = "inline-block";
